@@ -21,6 +21,7 @@
 from bs4 import BeautifulSoup
 import codecs
 import json
+from random import choice
 import re
 import tweepy
 import urllib2
@@ -97,23 +98,75 @@ def get():
 
 
 
-def process(title, artist, text):
-    # Find out how much of the chorus we can use, do replacement
+def split_chorus(title, artist, spl):
     ind = 0
     length = 0
-    spl = text.split("\n")
     while ind < len(spl):
-        if len(spl[ind]) < 20 and re.search(r'(\A[(\[](?:.*?)[)\]]\Z)', spl[ind]):
+        if re.search(r'(\A[(\[](?:.*?)[)\]]\Z)', spl[ind]):
             # Try to remove "[Chorus]", etc.
             spl.pop(ind)
             continue
         if length + len(spl[ind]) + len(title) + len(artist) > 120:
             break
+        if u"\u2019" in spl[ind]:
+            # Curly apostrophes are literally the worst
+            spl[ind] = spl[ind].replace(u"\u2019", "'")
         length += len(spl[ind])
         ind += 1
-    snip = " / ".join(spl[:ind])
-    print snip
-    print '"' + title + '"' + ", " + artist
+    return ind
+
+
+def get_rhyme(word):
+    try:
+        request_orig = urllib2.Request("http://rhymebrain.com/talk?function=getWordInfo&word=" + word)
+        response_orig = json.load(urllib2.urlopen(request_orig))
+        request = urllib2.Request("http://rhymebrain.com/talk?function=getRhymes&word=" + word)
+        response = json.load(urllib2.urlopen(request))
+    except urllib2.URLError as e:
+        pass
+    else:
+        print response_orig
+        syl_orig = response_orig["syllables"]
+        for result in response:
+            print result
+            if result["freq"] > 10 and abs(int(result["syllables"]) - int(syl_orig)) <= 1\
+                    and result["word"].lower() != word.lower():
+                return result["word"]
+
+
+def process(title, artist, text):
+    # Find out how much of the chorus we can use, do replacement
+    # I wrote this code at 4 in the morning; beware... Here be dragons.
+    spl = text.split("\n")
+    ind = split_chorus(title, artist, spl)
+    words = set(re.split(r"[^A-Za-z\-']", " ".join(spl[:ind])))
+    word_dict = {}
+    for word in words:
+        try:
+            request = urllib2.Request("http://api.wordnik.com:80/v4/word.json/" + word + \
+                                      "/frequency?useCanonical=false&startYear=1900&endYear=2012&" + \
+                                      "api_key=" + WORDNIK_KEY)
+            response = urllib2.urlopen(request)
+        except urllib2.URLError as e:
+            pass
+        else:
+            blob = json.load(response)
+            word_dict[blob["totalCount"]] = word
+
+    word = word_dict[min(word_dict.iterkeys())]
+    new_word = get_rhyme(word)
+
+    if word.istitle():
+        new_word = new_word.title()
+    elif word.islower():
+        new_word = new_word.lower()
+    for i in range(ind):
+        spl[i] = spl[i].replace(word, new_word)
+
+    print word + " -> " + new_word
+    tweet = "\"" + " / ".join(spl[:ind]) + "\""
+    tweet += " - \"" + title + "\", " + artist
+    print tweet
 
 
 def tweet(text):
