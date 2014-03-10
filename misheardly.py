@@ -19,6 +19,7 @@
 # SOFTWARE.
 
 from bs4 import BeautifulSoup
+import codecs
 import json
 import re
 import tweepy
@@ -48,11 +49,15 @@ def get():
                 title = track["name"]
 
                 # Check if we've already used this song
-                if title + ", " + artist in [line.strip() for line in open("tweeted_songs.txt", "r")]:
+                f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='r')
+                if title + ", " + artist in [line.strip() for line in f]:
                     continue
+                f.close()
+
                 # All systems go! Add to file so we don't keep trying it.
-                with open("tweeted_songs.txt", "a") as f:
-                    f.write("\n" + title + ", " + artist)
+                f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='a')
+                f.write("\n" + title + ", " + artist)
+                f.close()
 
                 # Format a URL to get the lyrics
                 formatted_title = re.sub(r'[^a-z0-9 ]', '', title.lower())
@@ -66,8 +71,8 @@ def get():
                     request = urllib2.Request(lyrics_url)
                     response = urllib2.urlopen(request)
                 except urllib2.URLError as e:
-                    print e.reason
-                    return
+                    # Errors will happen when you're making up URLs
+                    pass
                 lyrics_html = response.read()
                 soup = BeautifulSoup(lyrics_html)
                 lyrics_div = soup.find(id="songLyricsDiv")
