@@ -21,6 +21,7 @@
 from bs4 import BeautifulSoup
 import codecs
 import json
+import os
 from random import choice, shuffle
 import re
 import tweepy
@@ -32,7 +33,7 @@ from time import gmtime, strftime
 def get():
     # Get song lyrics from a popular song
     page = 1
-    while page <= 20:
+    while page <= 3:
         try:
             # Get the top songs
             request = urllib2.Request(
@@ -100,6 +101,9 @@ def get():
                 process(title, artist, chorus)
                 return
             page += 1
+    else:
+        # Cycle back around through the same songs, then
+        os.remove("tweeted_songs.txt")
 
 
 def split_chorus(title, artist, spl):
