@@ -39,8 +39,10 @@ def get():
                                       "api_key=" + LASTFM_KEY + "&format=json&page=" + str(page))
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
-            print e.reason
-            return
+            f = open("misheardly.log", 'a')
+            t = strftime("%d %b %Y %H:%M:%S", gmtime())
+            f.write("\n" + t + " " + e.reason)
+            f.close()
         else:
             # Extract the artist and track name
             blob = json.load(response)
@@ -50,10 +52,13 @@ def get():
                 title = track["name"]
 
                 # Check if we've already used this song
-                f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='r')
-                if title + ", " + artist in [line.strip() for line in f]:
-                    continue
-                f.close()
+                try:
+                    f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='r')
+                    if title + ", " + artist in [line.strip() for line in f]:
+                        continue
+                    f.close()
+                except IOError as e:
+                    pass
 
                 # All systems go! Add to file so we don't keep trying it.
                 f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='a')
@@ -65,7 +70,6 @@ def get():
                 formatted_artist = re.sub(r'[^a-z0-9 ]', '', artist.lower())
                 lyrics_url = "http://www.songlyrics.com/" + formatted_artist.replace(" ", "-") + \
                       "/" + formatted_title.replace(" ", "-") + "-lyrics/"
-                print lyrics_url
 
                 # Get the lyrics
                 try:
@@ -125,10 +129,8 @@ def get_rhyme(word):
     except urllib2.URLError as e:
         pass
     else:
-        print response_orig
         syl_orig = response_orig["syllables"]
         for result in response:
-            print result
             if result["freq"] > 10 and abs(int(result["syllables"]) - int(syl_orig)) <= 1\
                     and result["word"].lower() != word.lower():
                 return result["word"]
@@ -162,10 +164,9 @@ def process(title, artist, text):
     for i in range(ind):
         spl[i] = spl[i].replace(word, new_word)
 
-    print word + " -> " + new_word
-    tweet = "\"" + " / ".join(spl[:ind]) + "\""
-    tweet += " - \"" + title + "\", " + artist
-    print tweet
+    tw = "\"" + " / ".join(spl[:ind]) + "\""
+    tw += " - \"" + title + "\", " + artist
+    tweet(tw)
 
 
 def tweet(text):
@@ -185,7 +186,7 @@ def tweet(text):
     f.write("\n" + t + " " + text)
     f.close()
 
-    # # Post tweet
+    # Post tweet
     api.update_status(text)
     return True
 
