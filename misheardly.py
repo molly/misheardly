@@ -29,6 +29,9 @@ import urllib2
 from secrets import *
 from time import gmtime, strftime
 
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
 
 def get():
     # Get song lyrics from a popular song
@@ -41,7 +44,7 @@ def get():
                 "api_key=" + LASTFM_KEY + "&format=json&page=" + str(page))
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
-            f = open("misheardly.log", 'a')
+            f = open(os.path.join(__location__, "misheardly.log"), 'a')
             t = strftime("%d %b %Y %H:%M:%S", gmtime())
             f.write("\n" + t + " " + e.reason)
             f.close()
@@ -55,7 +58,8 @@ def get():
 
                 # Check if we've already used this song
                 try:
-                    f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='r')
+                    f = codecs.open(os.path.join(__location__,'tweeted_songs.txt'),
+                            encoding='utf-8', mode='r')
                     if title + ", " + artist in [line.strip() for line in f]:
                         continue
                     f.close()
@@ -63,7 +67,8 @@ def get():
                     pass
 
                 # All systems go! Add to file so we don't keep trying it.
-                f = codecs.open('tweeted_songs.txt', encoding='utf-8', mode='a')
+                f = codecs.open(os.path.join(__location__, 'tweeted_songs.txt'),
+                        encoding='utf-8', mode='a')
                 f.write("\n" + title + ", " + artist)
                 f.close()
 
@@ -200,7 +205,7 @@ def tweet(text):
             return False
 
     # Log tweet to file
-    f = open("misheardly.log", 'a')
+    f = open(os.path.join(__location__, "misheardly.log"), 'a')
     t = strftime("%d %b %Y %H:%M:%S", gmtime())
     f.write("\n" + t + " " + text)
     f.close()
