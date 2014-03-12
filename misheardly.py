@@ -172,7 +172,7 @@ def tweet(text):
     auth = tweepy.OAuthHandler(C_KEY, C_SECRET)
     auth.set_access_token(A_TOKEN, A_TOKEN_SECRET)
     api = tweepy.API(auth)
-    tweets = api.user_timeline('CyberPrefixer')
+    tweets = api.user_timeline('misheardly')
 
     # Check that we haven't tweeted this before
     for tw in tweets:
@@ -180,14 +180,14 @@ def tweet(text):
             return False
 
     # Log tweet to file
-    f = open("cyberprefixer.log", 'a')
+    f = open("misheardly.log", 'a')
     t = strftime("%d %b %Y %H:%M:%S", gmtime())
     f.write("\n" + t + " " + text)
     f.close()
 
     # # Post tweet
-    # api.update_status(text)
-    # return True
+    api.update_status(text)
+    return True
 
 if __name__ == "__main__":
     get()
