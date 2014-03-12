@@ -143,15 +143,14 @@ def process(title, artist, text):
     word_dict = {}
     for word in words:
         try:
-            request = urllib2.Request("http://api.wordnik.com:80/v4/word.json/" + word + \
-                                      "/frequency?useCanonical=false&startYear=1900&endYear=2012&" + \
-                                      "api_key=" + WORDNIK_KEY)
+            request = urllib2.Request("http://rhymebrain.com/talk?function=getWordInfo&word=" + \
+                                        word.lower())
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
             pass
         else:
             blob = json.load(response)
-            word_dict[blob["totalCount"]] = word
+            word_dict[blob["freq"]] = word
 
     word = word_dict[min(word_dict.iterkeys())]
     new_word = get_rhyme(word)
