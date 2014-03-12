@@ -21,7 +21,7 @@
 from bs4 import BeautifulSoup
 import codecs
 import json
-from random import choice
+from random import choice, shuffle
 import re
 import tweepy
 import urllib2
@@ -35,8 +35,9 @@ def get():
     while page <= 20:
         try:
             # Get the top songs
-            request = urllib2.Request("http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&" +
-                                      "api_key=" + LASTFM_KEY + "&format=json&page=" + str(page))
+            request = urllib2.Request(
+                "http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&" +
+                "api_key=" + LASTFM_KEY + "&format=json&page=" + str(page))
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
             f = open("misheardly.log", 'a')
@@ -69,7 +70,7 @@ def get():
                 formatted_title = re.sub(r'[^a-z0-9 ]', '', title.lower())
                 formatted_artist = re.sub(r'[^a-z0-9 ]', '', artist.lower())
                 lyrics_url = "http://www.songlyrics.com/" + formatted_artist.replace(" ", "-") + \
-                      "/" + formatted_title.replace(" ", "-") + "-lyrics/"
+                             "/" + formatted_title.replace(" ", "-") + "-lyrics/"
 
                 # Get the lyrics
                 try:
@@ -101,8 +102,8 @@ def get():
             page += 1
 
 
-
 def split_chorus(title, artist, spl):
+    # Split the chorus so that it's under the twitter character limit
     ind = 0
     length = 0
     while ind < len(spl):
@@ -120,9 +121,20 @@ def split_chorus(title, artist, spl):
     return ind
 
 
+def choose_word_freq(word_freqs):
+    # Choose one of the three lowest frequencies if there are > 3, otherwise just choose one
+    # from the list.
+    if len(word_freqs) > 3:
+        return choice(word_freqs[:3])
+    else:
+        return choice(word_freqs)
+
+
 def get_rhyme(word):
+    # Get a rhyme for the given word
     try:
-        request_orig = urllib2.Request("http://rhymebrain.com/talk?function=getWordInfo&word=" + word)
+        request_orig = urllib2.Request(
+            "http://rhymebrain.com/talk?function=getWordInfo&word=" + word)
         response_orig = json.load(urllib2.urlopen(request_orig))
         request = urllib2.Request("http://rhymebrain.com/talk?function=getRhymes&word=" + word)
         response = json.load(urllib2.urlopen(request))
@@ -130,15 +142,16 @@ def get_rhyme(word):
         pass
     else:
         syl_orig = response_orig["syllables"]
+        shuffle(response)   # mix things up a bit
         for result in response:
-            if result["freq"] > 10 and abs(int(result["syllables"]) - int(syl_orig)) <= 1\
-                    and result["word"].lower() != word.lower():
+            # Try to find a word that's relatively common, has a syllable count within 1 of the
+            # given word, has a "score" of > 250, and is not the same as the given word
+            if result["freq"] > 10 and abs(int(result["syllables"]) - int(syl_orig)) <= 1 and \
+                            result["score"] > 250 and result["word"].lower() != word.lower():
                 return result["word"]
-
 
 def process(title, artist, text):
     # Find out how much of the chorus we can use, do replacement
-    # I wrote this code at 4 in the morning; beware... Here be dragons.
     spl = text.split("\n")
     ind = split_chorus(title, artist, spl)
     words = set(re.split(r"[^A-Za-z\-']", " ".join(spl[:ind])))
@@ -146,7 +159,7 @@ def process(title, artist, text):
     for word in words:
         try:
             request = urllib2.Request("http://rhymebrain.com/talk?function=getWordInfo&word=" + \
-                                        word.lower())
+                                      word.lower())
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
             pass
@@ -154,7 +167,8 @@ def process(title, artist, text):
             blob = json.load(response)
             word_dict[blob["freq"]] = word
 
-    word = word_dict[min(word_dict.iterkeys())]
+    word_freqs = sorted(word_dict.keys())
+    word = word_dict[choose_word_freq(word_freqs)]
     new_word = get_rhyme(word)
 
     if word.istitle():
@@ -170,6 +184,7 @@ def process(title, artist, text):
 
 
 def tweet(text):
+    # Send the tweet
     auth = tweepy.OAuthHandler(C_KEY, C_SECRET)
     auth.set_access_token(A_TOKEN, A_TOKEN_SECRET)
     api = tweepy.API(auth)
@@ -189,6 +204,7 @@ def tweet(text):
     # Post tweet
     api.update_status(text)
     return True
+
 
 if __name__ == "__main__":
     get()
