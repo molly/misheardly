@@ -44,10 +44,7 @@ def get():
                 "api_key=" + LASTFM_KEY + "&format=json&page=" + str(page))
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
-            f = open(os.path.join(__location__, "misheardly.log"), 'a')
-            t = strftime("%d %b %Y %H:%M:%S", gmtime())
-            f.write("\n" + t + " " + e.reason)
-            f.close()
+            log("Error in requesting top tracks: " + e.reason)
         else:
             # Extract the artist and track name
             blob = json.load(response)
@@ -64,12 +61,13 @@ def get():
                         continue
                     f.close()
                 except IOError as e:
+                    log("Error in opening tweeted_songs: e.reason")
                     pass
 
                 # All systems go! Add to file so we don't keep trying it.
                 f = codecs.open(os.path.join(__location__, 'tweeted_songs.txt'),
                         encoding='utf-8', mode='a')
-                f.write("\n" + title + ", " + artist)
+#                f.write("\n" + title + ", " + artist)
                 f.close()
 
                 # Format a URL to get the lyrics
@@ -84,6 +82,7 @@ def get():
                     response = urllib2.urlopen(request)
                 except urllib2.URLError as e:
                     # Errors will happen when you're making up URLs
+                    log("Unable to get lyrics for " + title + ", " + artist + ": " + e.reason)
                     pass
                 lyrics_html = response.read()
                 soup = BeautifulSoup(lyrics_html)
@@ -91,24 +90,37 @@ def get():
 
                 # Couldn't find lyrics at this URL
                 if not lyrics_div:
+                    log("Unable to extract lyrics for "  + title + ", " + artist)
                     continue
 
                 # Try to get the chorus by splitting the lyrics by block, then finding the most
                 # frequently-occurring one
                 lyrics = lyrics_div.get_text()
-                spl = lyrics.replace("\r", "").split("\n\n")
+                spl = lyrics.replace("\r", "")
+                spl = re.sub(r'\[.+?\]', '', spl)
+                spl = spl.split("\n\n")
                 spl = [x for x in spl if "\n" in x]
                 if not spl:
+                    log("Unable to split lyrics for "  + title + ", " + artist)
                     continue
-                chorus = max(set(spl), key=spl.count)
+                chorus = ""
+                try_num = 0
+                while len(chorus) < 30 and try_num < 3:
+                    chorus = choice(spl)
+                    try_num += 1
                 if len(chorus) < 30:
+                    log("Unable to find long enough chorus for "  + title + ", " + artist)
                     continue
                 process(title, artist, chorus)
                 return
             page += 1
     else:
         # Cycle back around through the same songs, then
-        os.remove("tweeted_songs.txt")
+        log("Removing tweeted_songs file.")
+        try:
+            os.remove("tweeted_songs.txt")
+        except OSError as e:
+            log("Unable to remove tweeted_songs file: " + e.reason)
 
 
 def split_chorus(title, artist, spl):
@@ -148,6 +160,7 @@ def get_rhyme(word):
         request = urllib2.Request("http://rhymebrain.com/talk?function=getRhymes&word=" + word)
         response = json.load(urllib2.urlopen(request))
     except urllib2.URLError as e:
+        log("Error while retrieving rhyme for " + word + ": " + e.reason)
         pass
     else:
         syl_orig = response_orig["syllables"]
@@ -155,13 +168,14 @@ def get_rhyme(word):
         for result in response:
             # Try to find a word that's relatively common, has a syllable count within 1 of the
             # given word, has a "score" of > 250, and is not the same as the given word
-            if result["freq"] > 10 and abs(int(result["syllables"]) - int(syl_orig)) <= 1 and \
+            if result["freq"] > 10 and abs(int(result["syllables"]) == int(syl_orig)) and \
                             result["score"] > 250 and result["word"].lower() != word.lower():
                 return result["word"]
 
 def process(title, artist, text):
     # Find out how much of the chorus we can use, do replacement
     spl = text.split("\n")
+    spl = filter(None, spl)
     ind = split_chorus(title, artist, spl)
     words = set(re.split(r"[^A-Za-z\-']", " ".join(spl[:ind])))
     word_dict = {}
@@ -171,6 +185,7 @@ def process(title, artist, text):
                                       word.lower())
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
+            log("Unable to get word info for " + word.lower() + ": " + e.reason)
             pass
         else:
             blob = json.load(response)
@@ -179,6 +194,9 @@ def process(title, artist, text):
     word_freqs = sorted(word_dict.keys())
     word = word_dict[choose_word_freq(word_freqs)]
     new_word = get_rhyme(word)
+    if not new_word:
+        log("Can't get rhyme for " + word)
+        return
 
     if word.istitle():
         new_word = new_word.title()
@@ -202,18 +220,21 @@ def tweet(text):
     # Check that we haven't tweeted this before
     for tw in tweets:
         if text == tw.text:
+            log("We've tweeted this before.")
             return False
 
     # Log tweet to file
-    f = open(os.path.join(__location__, "misheardly.log"), 'a')
-    t = strftime("%d %b %Y %H:%M:%S", gmtime())
-    f.write("\n" + t + " " + text)
-    f.close()
+    log(text)
 
     # Post tweet
     api.update_status(text)
     return True
 
+def log(text):
+    f = open(os.path.join(__location__, "misheardly.log"), 'a')
+    t = strftime("%d %b %Y %H:%M:%S", gmtime())
+    f.write("\n" + t + " " + text.encode('ascii', 'replace'))
+    f.close()
 
 if __name__ == "__main__":
     get()
