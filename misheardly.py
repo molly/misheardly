@@ -43,7 +43,7 @@ def get():
                 "api_key=" + LASTFM_KEY + "&format=json&page=" + str(page))
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
-            log("Error in requesting top tracks: " + e.reason)
+            log("Error in requesting top tracks: " + e.strerror)
         else:
             # Extract the artist and track name
             blob = json.load(response)
@@ -60,7 +60,7 @@ def get():
                         continue
                     f.close()
                 except IOError as e:
-                    log("Error in opening tweeted_songs: e.reason")
+                    log("Error in opening tweeted_songs: e.strerror")
                     pass
 
                 # All systems go! Add to file so we don't keep trying it.
@@ -81,7 +81,7 @@ def get():
                     response = urllib2.urlopen(request)
                 except urllib2.URLError as e:
                     # Errors will happen when you're making up URLs
-                    log("Unable to get lyrics for " + title + ", " + artist + ": " + e.reason)
+                    log("Unable to get lyrics for " + title + ", " + artist + ": " + e.strerror)
                     pass
                 lyrics_html = response.read()
                 soup = BeautifulSoup(lyrics_html)
@@ -119,7 +119,7 @@ def get():
         try:
             os.remove("tweeted_songs.txt")
         except OSError as e:
-            log("Unable to remove tweeted_songs file: " + e.reason)
+            log("Unable to remove tweeted_songs file: " + e.strerror)
 
 
 def split_chorus(title, artist, spl):
@@ -136,6 +136,8 @@ def split_chorus(title, artist, spl):
         if u"\u2019" in spl[ind]:
             # Curly apostrophes are literally the worst
             spl[ind] = spl[ind].replace(u"\u2019", "'")
+        if u"\u2018" in spl[ind]:
+            spl[ind] = spl[ind].replace(u"\u2018", "'")
         length += len(spl[ind])
         ind += 1
     return ind
@@ -159,7 +161,7 @@ def get_rhyme(word):
         request = urllib2.Request("http://rhymebrain.com/talk?function=getRhymes&word=" + word)
         response = json.load(urllib2.urlopen(request))
     except urllib2.URLError as e:
-        log("Error while retrieving rhyme for " + word + ": " + e.reason)
+        log("Error while retrieving rhyme for " + word + ": " + e.strerror)
         pass
     else:
         syl_orig = response_orig["syllables"]
@@ -184,7 +186,7 @@ def process(title, artist, text):
                                       word.lower())
             response = urllib2.urlopen(request)
         except urllib2.URLError as e:
-            log("Unable to get word info for " + word.lower() + ": " + e.reason)
+            log("Unable to get word info for " + word.lower() + ": " + e.strerror)
             pass
         else:
             blob = json.load(response)
