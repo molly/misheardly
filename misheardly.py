@@ -117,7 +117,7 @@ def get():
         # Cycle back around through the same songs, then
         log("Removing tweeted_songs file.")
         try:
-            os.remove("tweeted_songs.txt")
+            os.remove("./tweeted_songs.txt")
         except OSError as e:
             log("Unable to remove tweeted_songs file: " + e.strerror)
 
